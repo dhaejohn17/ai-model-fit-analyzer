@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+:root {
+  --bg-950: #090d16;
+  --bg-900: #111827;
+  --bg-850: #1f2937;
+  --bg-800: #374151;
+  --text-300: #9ca3af;
+  --text-200: #e5e7eb;
+  --text-white: #ffffff;
+}
+
+:root.light {
+  --bg-950: #f3f4f6;
+  --bg-900: #ffffff;
+  --bg-850: #cbd5e1;
+  --bg-800: #94a3b8;
+  --text-300: #475569;
+  --text-200: #1e293b;
+  --text-white: #0f172a;
+}
+
+@theme {
+  --color-zinc-955: var(--bg-950);
+  --color-zinc-950: var(--bg-950);
+  --color-zinc-900: var(--bg-900);
+  --color-zinc-850: var(--bg-850);
+  --color-zinc-800: var(--bg-800);
+  --color-zinc-300: var(--text-200);
+  --color-zinc-200: var(--text-200);
+  --color-zinc-100: var(--text-white);
+  --color-white: var(--text-white);
+}
+
+/* Custom scrollbars for light & dark themes */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-950);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-800);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-850);
+}
+

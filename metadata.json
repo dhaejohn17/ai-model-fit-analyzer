@@ -1,0 +1,5 @@
+{
+  "name": "AI Model Fit Analyzer",
+  "description": "An intelligent advisor that analyzes hardware specifications, operating system, and deployment architecture to match them with the optimal local or cloud AI models, predicting tokens per second and estimating VRAM specs.",
+  "requestFramePermissions": []
+}
