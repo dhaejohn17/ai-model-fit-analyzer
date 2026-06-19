@@ -1425,147 +1425,168 @@ export default function App() {
                     <h4 className="font-bold text-zinc-300 tracking-wider uppercase font-mono text-xs">Structured Allocation Report</h4>
                   </div>
 
-                  {/* Built-in simple markdown to clean HTML parser list */}
+                  {/* Line-aware markdown renderer: tolerates missing blank lines
+                      between headings/tables and strips --- horizontal rules. */}
                   <div className="space-y-3.5 text-zinc-350">
-                    {analysisMarkdown.split("\n\n").map((block, idx) => {
-                      const trimmedBlock = block.trim();
-                      if (!trimmedBlock) return null;
+                    {(() => {
+                      const lines = analysisMarkdown.split("\n");
+                      const out: React.ReactNode[] = [];
+                      let i = 0;
+                      let key = 0;
 
-                      // Section Headers
-                      if (trimmedBlock.startsWith("## ")) {
-                        return (
-                          <h2 key={idx} className="text-xs font-bold text-zinc-200 border-b border-zinc-805 pb-1 pt-3 flex items-center uppercase tracking-wide font-mono">
-                            {trimmedBlock.replace("## ", "")}
-                          </h2>
+                      // Render inline **bold** spans within a line of text.
+                      const renderInline = (text: string) =>
+                        text.split("**").map((frag, fIdx) =>
+                          fIdx % 2 === 1
+                            ? <strong key={fIdx} className="text-zinc-200 font-bold">{frag}</strong>
+                            : <React.Fragment key={fIdx}>{frag}</React.Fragment>
                         );
-                      }
-                      if (trimmedBlock.startsWith("### ")) {
-                        return (
-                          <h3 key={idx} className="text-[11px] font-bold text-cyan-400 pt-1.5 flex items-center uppercase font-mono tracking-tight">
-                            {trimmedBlock.replace("### ", "")}
-                          </h3>
-                        );
-                      }
 
-                      // Bold Bullet Items
-                      if (trimmedBlock.startsWith("- ") || trimmedBlock.startsWith("* ")) {
-                        return (
-                          <ul key={idx} className="list-disc pl-4 space-y-1 text-xs text-zinc-400">
-                            {trimmedBlock.split("\n").map((line, lIdx) => {
-                              const cleanedLine = line.replace(/^[\-\*]\s+/, "");
-                              
-                              // Detect bold in lists
-                              const boldMatch = cleanedLine.split("**");
-                              if (boldMatch.length > 2) {
-                                return (
-                                  <li key={lIdx}>
-                                    <strong className="text-zinc-200 font-bold">{boldMatch[1]}</strong>
-                                    {boldMatch.slice(2).join("")}
-                                  </li>
-                                );
-                              }
-                              return <li key={lIdx}>{cleanedLine}</li>;
-                            })}
-                          </ul>
-                        );
-                      }
+                      const splitRow = (l: string) =>
+                        l.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(c => c.trim());
+                      const isSeparatorRow = (l: string) => /^\s*\|?[\s:|-]+\|?\s*$/.test(l) && l.includes("-");
 
-                      // Table parser - extremely durable rendering for top models comparison table
-                      if (trimmedBlock.startsWith("|")) {
-                        const lines = trimmedBlock.split("\n");
-                        const rows = lines.map(line => line.split("|").map(col => col.trim()).filter((col, colIdx) => colIdx > 0 && colIdx < line.split("|").length - 1));
-                        
-                        // Header vs Separator vs Row list
-                        const headers = rows[0];
-                        const contentRows = rows.slice(2); // Skip header and separator e.g. |---|---|
+                      while (i < lines.length) {
+                        const line = lines[i].trim();
 
-                        return (
-                          <div key={idx} className="overflow-x-auto my-3 border border-zinc-850 rounded bg-zinc-950">
-                            <table className="w-full text-left text-[11px] font-mono border-collapse">
-                              <thead>
-                                <tr className="bg-zinc-900 border-b border-zinc-850 text-zinc-400">
-                                  {headers && headers.map((header, hIdx) => (
-                                    <th key={hIdx} className="p-2 font-semibold font-mono text-[9px] uppercase tracking-wider">{header}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-zinc-850">
-                                {contentRows.map((row, rIdx) => (
-                                  <tr key={rIdx} className="hover:bg-zinc-900/40 text-zinc-300">
-                                    {row.map((cell, cIdx) => (
-                                      <td key={cIdx} className="p-2">
-                                        {cell.includes("★★★") ? (
-                                          <span className="text-amber-500 font-bold">{cell}</span>
-                                        ) : cell.toLowerCase() === "local" ? (
-                                          <span className="px-1.5 py-0.5 rounded bg-emerald-950/30 text-emerald-400 border border-emerald-900/30 text-[9px] font-bold uppercase tracking-tighter">Local</span>
-                                        ) : cell.toLowerCase() === "cloud / hybrid" || cell.toLowerCase() === "cloud" ? (
-                                          <span className="px-1.5 py-0.5 rounded bg-cyan-950/35 text-cyan-400 border border-cyan-855 text-[9px] font-bold uppercase tracking-tighter">Cloud</span>
-                                        ) : (
-                                          <span>{cell}</span>
-                                        )}
-                                      </td>
+                        // Blank lines and --- horizontal rules: skip.
+                        if (!line || /^-{3,}$/.test(line) || /^\*{3,}$/.test(line)) { i++; continue; }
+
+                        // Headings (#### / ### / ## / #)
+                        const heading = line.match(/^(#{1,4})\s+(.*)$/);
+                        if (heading) {
+                          const level = heading[1].length;
+                          const text = heading[2];
+                          if (level <= 2) {
+                            out.push(
+                              <h2 key={key++} className="text-xs font-bold text-zinc-200 border-b border-zinc-805 pb-1 pt-3 flex items-center uppercase tracking-wide font-mono">
+                                {renderInline(text)}
+                              </h2>
+                            );
+                          } else {
+                            out.push(
+                              <h3 key={key++} className="text-[11px] font-bold text-cyan-400 pt-1.5 flex items-center uppercase font-mono tracking-tight">
+                                {renderInline(text)}
+                              </h3>
+                            );
+                          }
+                          i++;
+                          continue;
+                        }
+
+                        // Fenced code block
+                        if (line.startsWith("```")) {
+                          i++; // skip opening fence
+                          const codeLines: string[] = [];
+                          while (i < lines.length && !lines[i].trim().startsWith("```")) {
+                            codeLines.push(lines[i]);
+                            i++;
+                          }
+                          i++; // skip closing fence
+                          const code = codeLines.join("\n");
+                          const codeId = `code_${key}`;
+                          out.push(
+                            <div key={key++} className="relative group my-2">
+                              <div className="absolute right-2 top-2 z-10 flex space-x-1 opacity-0 group-hover:opacity-100 transition duration-150">
+                                <button
+                                  onClick={() => handleCopyToClipboard(code, codeId)}
+                                  className="p-0.5 px-2 rounded bg-zinc-900 hover:bg-zinc-850 text-zinc-350 hover:text-white border border-zinc-800 text-[9px] transition flex items-center space-x-1 font-mono uppercase font-bold tracking-tighter"
+                                >
+                                  {copiedText === codeId ? (
+                                    <><Check className="h-3 w-3 text-emerald-400" /><span>Copied!</span></>
+                                  ) : (
+                                    <><Copy className="h-3 w-3" /><span>Copy</span></>
+                                  )}
+                                </button>
+                              </div>
+                              <pre className="bg-zinc-950 border border-zinc-850 rounded p-3 overflow-x-auto text-emerald-400 text-xs font-mono select-text leading-relaxed">
+                                <code>{code}</code>
+                              </pre>
+                            </div>
+                          );
+                          continue;
+                        }
+
+                        // Table: consecutive lines starting with |
+                        if (line.startsWith("|")) {
+                          const tableLines: string[] = [];
+                          while (i < lines.length && lines[i].trim().startsWith("|")) {
+                            tableLines.push(lines[i].trim());
+                            i++;
+                          }
+                          const headers = splitRow(tableLines[0]);
+                          const contentRows = tableLines
+                            .slice(1)
+                            .filter(l => !isSeparatorRow(l))
+                            .map(splitRow);
+
+                          out.push(
+                            <div key={key++} className="overflow-x-auto my-3 border border-zinc-850 rounded bg-zinc-950">
+                              <table className="w-full text-left text-[11px] font-mono border-collapse">
+                                <thead>
+                                  <tr className="bg-zinc-900 border-b border-zinc-850 text-zinc-400">
+                                    {headers.map((header, hIdx) => (
+                                      <th key={hIdx} className="p-2 font-semibold font-mono text-[9px] uppercase tracking-wider">{header}</th>
                                     ))}
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        );
-                      }
-
-                      // Code Block
-                      if (trimmedBlock.startsWith("```")) {
-                        const rawLines = trimmedBlock.split("\n");
-                        const code = rawLines.slice(1, rawLines.length - 1).join("\n");
-                        return (
-                          <div key={idx} className="relative group my-2">
-                            <div className="absolute right-2 top-2 z-10 flex space-x-1 opacity-0 group-hover:opacity-100 transition duration-150">
-                              <button
-                                onClick={() => handleCopyToClipboard(code, `code_${idx}`)}
-                                className="p-0.5 px-2 rounded bg-zinc-900 hover:bg-zinc-850 text-zinc-350 hover:text-white border border-zinc-800 text-[9px] transition flex items-center space-x-1 font-mono uppercase font-bold tracking-tighter"
-                              >
-                                {copiedText === `code_${idx}` ? (
-                                  <>
-                                    <Check className="h-3 w-3 text-emerald-400" />
-                                    <span>Copied!</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="h-3 w-3" />
-                                    <span>Copy</span>
-                                  </>
-                                )}
-                              </button>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-850">
+                                  {contentRows.map((row, rIdx) => (
+                                    <tr key={rIdx} className="hover:bg-zinc-900/40 text-zinc-300">
+                                      {row.map((cell, cIdx) => (
+                                        <td key={cIdx} className="p-2">
+                                          {cell.includes("★★★") ? (
+                                            <span className="text-amber-500 font-bold">{cell}</span>
+                                          ) : cell.toLowerCase() === "local" ? (
+                                            <span className="px-1.5 py-0.5 rounded bg-emerald-950/30 text-emerald-400 border border-emerald-900/30 text-[9px] font-bold uppercase tracking-tighter">Local</span>
+                                          ) : cell.toLowerCase() === "cloud / hybrid" || cell.toLowerCase() === "cloud" ? (
+                                            <span className="px-1.5 py-0.5 rounded bg-cyan-950/35 text-cyan-400 border border-cyan-855 text-[9px] font-bold uppercase tracking-tighter">Cloud</span>
+                                          ) : (
+                                            renderInline(cell)
+                                          )}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
-                            <pre className="bg-zinc-950 border border-zinc-850 rounded p-3 overflow-x-auto text-emerald-400 text-xs font-mono select-text leading-relaxed">
-                              <code>{code}</code>
-                            </pre>
-                          </div>
+                          );
+                          continue;
+                        }
+
+                        // Bullet list: consecutive - / * lines
+                        if (/^[-*]\s+/.test(line)) {
+                          const items: string[] = [];
+                          while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
+                            items.push(lines[i].trim().replace(/^[-*]\s+/, ""));
+                            i++;
+                          }
+                          out.push(
+                            <ul key={key++} className="list-disc pl-4 space-y-1 text-xs text-zinc-400">
+                              {items.map((item, lIdx) => <li key={lIdx}>{renderInline(item)}</li>)}
+                            </ul>
+                          );
+                          continue;
+                        }
+
+                        // Paragraph: gather consecutive plain lines
+                        const paraLines: string[] = [];
+                        while (i < lines.length) {
+                          const l = lines[i].trim();
+                          if (!l || /^-{3,}$/.test(l) || /^#{1,4}\s/.test(l) || l.startsWith("|") || l.startsWith("```") || /^[-*]\s+/.test(l)) break;
+                          paraLines.push(l);
+                          i++;
+                        }
+                        out.push(
+                          <p key={key++} className="text-zinc-400 font-sans text-xs leading-relaxed">
+                            {renderInline(paraLines.join(" "))}
+                          </p>
                         );
                       }
 
-                      // Generic blocks handling bold highlight keywords
-                      const boldMatch = trimmedBlock.split("**");
-                      if (boldMatch.length > 2) {
-                        return (
-                          <div key={idx} className="text-zinc-400 font-sans text-xs leading-relaxed">
-                            {boldMatch.map((textFragment, fIdx) => (
-                              fIdx % 2 === 1 ? (
-                                <strong key={fIdx} className="text-zinc-200 font-bold">{textFragment}</strong>
-                              ) : (
-                                textFragment
-                              )
-                            ))}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <p key={idx} className="text-zinc-400 font-sans text-xs leading-relaxed">
-                          {trimmedBlock}
-                        </p>
-                      );
-                    })}
+                      return out;
+                    })()}
                   </div>
                 </div>
                                {/* Integration Command Snippet Card */}
