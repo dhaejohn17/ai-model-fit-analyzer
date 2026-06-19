@@ -272,8 +272,9 @@ WORKLOAD:
 - Required context window: ${data.contextWindow || "Unsure/Default"}
 
 HARDWARE:
-- CPU: ${data.cpu || "Modern Multi-core CPU"}
-- GPU: ${data.gpu || "none"}
+- CPU: ${data.cpu || "Modern Multi-core CPU"}${data.hardwareConcurrency ? ` (${data.hardwareConcurrency} threads)` : ""}
+- GPU: ${data.gpuName && data.gpuName.toLowerCase() !== "none" ? data.gpuName : "none"}
+- VRAM: ${data.vram && data.vram !== "none" ? data.vram : "none (CPU-only inference)"}
 - RAM: ${data.ram || "16GB"}
 - Storage: ${data.storage || "SSD"}
 - OS: ${data.os || "Windows 11"}
