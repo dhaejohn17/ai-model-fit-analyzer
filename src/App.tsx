@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { SystemSpecs, SteerableSettings, ChatMessage } from "./types";
 import { GPU_DATABASE } from "./data/gpuDatabase";
+import { CPU_DATABASE } from "./data/cpuDatabase";
 import CompatibilityMatrix from "./components/CompatibilityMatrix";
 import IntegrationPortal from "./components/IntegrationPortal";
 
@@ -96,8 +97,9 @@ export default function App() {
       detectedOS = "Linux";
     }
 
-    const cores = navigator.hardwareConcurrency || 8;
-    const cpuStr = `${cores} Core CPU`;
+    // navigator.hardwareConcurrency reports logical processors (threads).
+    const threads = navigator.hardwareConcurrency || 8;
+    const cpuStr = `${threads}-Thread CPU (auto-detected)`;
 
     // Attempt to read navigator.deviceMemory which chrome sets (capped at 8GB for privacy)
     let memoryStr = "16GB";
@@ -119,9 +121,21 @@ export default function App() {
           if (renderer) {
             gpuName = renderer;
             const nameLower = renderer.toLowerCase();
-            
+
             // Intel integrated vs NVIDIA vs AMD
-            if (nameLower.includes("rtx 4090")) {
+            if (nameLower.includes("rtx 5090")) {
+              vramEstimate = "32GB";
+            } else if (nameLower.includes("rtx 5080")) {
+              vramEstimate = "16GB";
+            } else if (nameLower.includes("rtx 5070 ti") || nameLower.includes("5070ti")) {
+              vramEstimate = "16GB";
+            } else if (nameLower.includes("rtx 5070")) {
+              vramEstimate = "12GB";
+            } else if (nameLower.includes("rtx 5060 ti") || nameLower.includes("5060ti")) {
+              vramEstimate = "16GB";
+            } else if (nameLower.includes("rtx 5060") || nameLower.includes("rtx 5050")) {
+              vramEstimate = "8GB";
+            } else if (nameLower.includes("rtx 4090")) {
               vramEstimate = "24GB";
             } else if (nameLower.includes("rtx 4080")) {
               vramEstimate = "16GB";
@@ -167,9 +181,15 @@ export default function App() {
       }
     }
 
+    // Strip trailing PCI device id some drivers append, e.g. " (0x00002D04)"
+    gpuName = gpuName.replace(/\s*\(0x[0-9a-fA-F].*$/i, "").trim();
+    // Drop a trailing " Direct3D11..." / vendor suffix if present
+    gpuName = gpuName.replace(/\s+Direct3D.*$/i, "").trim();
+
     return {
       cpu: cpuStr,
-      hardwareConcurrency: cores,
+      cpuCores: 0, // unknown from the browser; set when a CPU model is picked
+      hardwareConcurrency: threads,
       gpuName: gpuName,
       vram: vramEstimate,
       ram: memoryStr,
@@ -190,6 +210,7 @@ export default function App() {
   const [isRefreshingSpecs, setIsRefreshingSpecs] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [showGpuDropdown, setShowGpuDropdown] = useState<boolean>(false);
+  const [showCpuDropdown, setShowCpuDropdown] = useState<boolean>(false);
 
   // Settings Panel State
   const [settings, setSettings] = useState<SteerableSettings>({
@@ -459,6 +480,7 @@ export default function App() {
       },
       hardwareSpecs: {
         cpu: specs.cpu,
+        cpuCores: specs.cpuCores,
         hardwareConcurrency: specs.hardwareConcurrency,
         gpuName: specs.gpuName,
         vram: specs.vram,
@@ -665,33 +687,74 @@ export default function App() {
             {/* Editing / Customizing Hardware fields */}
             <div className="space-y-3 font-sans text-xs">
               
-              {/* CPU Core Input */}
-              <div className="grid grid-cols-3 items-center gap-2">
+              {/* CPU Model Search lookup */}
+              <div className="grid grid-cols-3 items-center gap-2 relative">
                 <label className="text-zinc-500 font-bold text-[10px] uppercase tracking-wider font-mono">CPU Model</label>
-                <div className="col-span-2">
-                  <input
-                    type="text"
-                    value={specs.cpu}
-                    onChange={(e) => setSpecs(p => ({ ...p, cpu: e.target.value }))}
-                    className="w-full bg-zinc-950 border border-zinc-850 rounded px-2.5 py-1 text-white font-mono text-xs focus:border-cyan-500 focus:outline-none"
-                    placeholder="e.g. Core i9-14900K"
-                  />
+                <div className="col-span-2 relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={specs.cpu}
+                      onChange={(e) => {
+                        setSpecs(p => ({ ...p, cpu: e.target.value }));
+                        setShowCpuDropdown(true);
+                      }}
+                      onFocus={() => setShowCpuDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowCpuDropdown(false), 250)}
+                      className="w-full bg-zinc-950 border border-zinc-850 rounded pl-7 pr-2.5 py-1 text-white font-mono text-xs focus:border-cyan-500 focus:outline-none"
+                      placeholder="e.g. Search Ryzen 5 5600X..."
+                    />
+                    <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-zinc-500" />
+                  </div>
+                  {/* Dropdown popup overlay */}
+                  {showCpuDropdown && specs.cpu.trim().length > 0 && (
+                    <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-zinc-950 border border-zinc-800 rounded z-50 shadow-2xl font-mono text-[11px] divide-y divide-zinc-900">
+                      {CPU_DATABASE.filter(chip => chip.name.toLowerCase().includes(specs.cpu.toLowerCase()))
+                        .slice(0, 6)
+                        .map((chip, cIdx) => (
+                          <button
+                            key={cIdx}
+                            type="button"
+                            onClick={() => {
+                              setSpecs(p => ({
+                                ...p,
+                                cpu: chip.name,
+                                cpuCores: chip.cores,
+                                hardwareConcurrency: chip.threads
+                              }));
+                              setShowCpuDropdown(false);
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-zinc-900 text-zinc-350 hover:text-white transition flex justify-between items-center"
+                          >
+                            <span className="truncate">{chip.name}</span>
+                            <span className="text-[10px] text-cyan-400 font-bold shrink-0">{chip.cores}C / {chip.threads}T</span>
+                          </button>
+                        ))}
+                      {CPU_DATABASE.filter(chip => chip.name.toLowerCase().includes(specs.cpu.toLowerCase())).length === 0 && (
+                        <div className="px-3 py-2 text-zinc-650 italic">No matching CPU found — typed value is still used</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Concurrency CPU / threads */}
+              {/* Cores / Threads readout (follows the selected CPU model) */}
               <div className="grid grid-cols-3 items-center gap-2">
-                <label className="text-zinc-500 font-bold text-[10px] uppercase tracking-wider font-mono">CPU Threads</label>
+                <label className="text-zinc-500 font-bold text-[10px] uppercase tracking-wider font-mono">Cores / Threads</label>
                 <div className="col-span-2 flex items-center space-x-2">
-                  <input
-                    type="range"
-                    min="1"
-                    max="64"
-                    value={specs.hardwareConcurrency}
-                    onChange={(e) => setSpecs(p => ({ ...p, hardwareConcurrency: parseInt(e.target.value), cpu: `${e.target.value} Thread CPU` }))}
-                    className="flex-1 accent-cyan-500 h-1 bg-zinc-800 rounded"
-                  />
-                  <span className="font-mono text-xs text-cyan-400 w-8 text-right font-bold">{specs.hardwareConcurrency}</span>
+                  <div className="flex-1 bg-zinc-950 border border-zinc-850 rounded px-2.5 py-1 flex items-center space-x-3 font-mono">
+                    <span className="flex items-center space-x-1">
+                      <Cpu className="h-3 w-3 text-emerald-400" />
+                      <span className="text-cyan-400 font-bold">{specs.cpuCores > 0 ? specs.cpuCores : "—"}</span>
+                      <span className="text-zinc-500 text-[10px] uppercase">Cores</span>
+                    </span>
+                    <span className="text-zinc-700">|</span>
+                    <span className="flex items-center space-x-1">
+                      <Activity className="h-3 w-3 text-cyan-400" />
+                      <span className="text-cyan-400 font-bold">{specs.hardwareConcurrency}</span>
+                      <span className="text-zinc-500 text-[10px] uppercase">Threads</span>
+                    </span>
+                  </div>
                 </div>
               </div>
 

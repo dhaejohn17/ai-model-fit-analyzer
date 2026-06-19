@@ -1,5 +1,6 @@
 export interface SystemSpecs {
   cpu: string;
+  cpuCores: number;
   hardwareConcurrency: number;
   gpuName: string;
   vram: string;

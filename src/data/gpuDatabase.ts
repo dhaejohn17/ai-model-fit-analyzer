@@ -5,6 +5,16 @@ export interface GPUInfo {
 }
 
 export const GPU_DATABASE: GPUInfo[] = [
+  // NVIDIA 50-series Desktop (Blackwell)
+  { name: "NVIDIA GeForce RTX 5090", vram: "32GB", brand: "NVIDIA" },
+  { name: "NVIDIA GeForce RTX 5080", vram: "16GB", brand: "NVIDIA" },
+  { name: "NVIDIA GeForce RTX 5070 Ti", vram: "16GB", brand: "NVIDIA" },
+  { name: "NVIDIA GeForce RTX 5070", vram: "12GB", brand: "NVIDIA" },
+  { name: "NVIDIA GeForce RTX 5060 Ti (16GB)", vram: "16GB", brand: "NVIDIA" },
+  { name: "NVIDIA GeForce RTX 5060 Ti (8GB)", vram: "8GB", brand: "NVIDIA" },
+  { name: "NVIDIA GeForce RTX 5060", vram: "8GB", brand: "NVIDIA" },
+  { name: "NVIDIA GeForce RTX 5050", vram: "8GB", brand: "NVIDIA" },
+
   // NVIDIA 40-series Desktop
   { name: "NVIDIA GeForce RTX 4090", vram: "24GB", brand: "NVIDIA" },
   { name: "NVIDIA GeForce RTX 4080 Super", vram: "16GB", brand: "NVIDIA" },

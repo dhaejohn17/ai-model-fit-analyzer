@@ -272,7 +272,7 @@ WORKLOAD:
 - Required context window: ${data.contextWindow || "Unsure/Default"}
 
 HARDWARE:
-- CPU: ${data.cpu || "Modern Multi-core CPU"}${data.hardwareConcurrency ? ` (${data.hardwareConcurrency} threads)` : ""}
+- CPU: ${data.cpu || "Modern Multi-core CPU"}${data.hardwareConcurrency ? ` (${data.cpuCores ? `${data.cpuCores} cores / ` : ""}${data.hardwareConcurrency} threads)` : ""}
 - GPU: ${data.gpuName && data.gpuName.toLowerCase() !== "none" ? data.gpuName : "none"}
 - VRAM: ${data.vram && data.vram !== "none" ? data.vram : "none (CPU-only inference)"}
 - RAM: ${data.ram || "16GB"}
